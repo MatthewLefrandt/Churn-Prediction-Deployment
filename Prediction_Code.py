@@ -1,91 +1,90 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[ ]:
+
+
 import streamlit as st
-import pickle  # For loading the pickled model
-import pandas as pd  # For handling user input data
-from sklearn.preprocessing import OneHotEncoder  # For categorical feature encoding
+import pandas as pd
+import numpy as np
+import pickle
+
+# Load the trained model
+filename = 'BestModel_XGB_rev.pkl'
+model = pickle.load(open(filename, 'rb'))
+
+# Load the encoder objects
+filename_gender_encode = 'gender_encode.pkl'
+gender_encode = pickle.load(open(filename_gender_encode, 'rb'))
+
+filename_geo_encode = 'oneHot_encode_geo.pkl'
+geo_encoder = pickle.load(open(filename_geo_encode, 'rb'))
+
+# Robust and MinMax scalers
+robust_scaler = pickle.load(open('robust_scaler.pkl', 'rb'))
+minmax_scaler = pickle.load(open('minmax_scaler.pkl', 'rb'))
 
 def main():
-    """Main function to structure your Streamlit app"""
+    st.title('Churn Prediction App')
 
-    # Add a title and description
-    st.title("Churn Prediction App")
-    st.write("Use this app to predict customer churn based on their profile.")
+    # Get user input
+    credit_score = st.number_input("Credit Score", 0, 1000)
+    geography = st.selectbox("Geography", ["France", "Germany", "Spain"])
+    gender = st.selectbox("Gender", ["Male", "Female"])
+    age = st.number_input("Age", 0, 100)
+    tenure = st.number_input("Tenure", 0, 100)
+    balance = st.number_input("Balance", 0, 100000)
+    num_of_products = st.number_input("Number of Products", 0, 10)
+    has_cr_card = st.selectbox("Has Credit Card", ["Yes", "No"])
+    is_active_member = st.selectbox("Is Active Member", ["Yes", "No"])
+    estimated_salary = st.number_input("Estimated Salary", 0, 1000000)
 
-    # User input section with clear labels
-    credit_score = st.number_input("Credit Score:")
-    geography = st.selectbox("Geography:", ["France", "Germany", "Spain"])  # Adjust options based on data
-    gender = st.selectbox("Gender:", ["Male", "Female"])
-    age = st.number_input("Age:")
-    tenure = st.number_input("Tenure (years with company):")
-    balance = st.number_input("Balance (account balance):")
-    num_of_products = st.number_input("Number of Products:")
-    has_cr_card = st.selectbox("Has Credit Card? (Yes/No)", ["Yes", "No"])
-    is_active_member = st.selectbox("Is Active Member? (Yes/No)", ["Yes", "No"])
-    estimated_salary = st.number_input("Estimated Salary:")
+    if st.button('Predict'):
+        # Preprocess the input features
+        features = preprocess_features(credit_score, geography, gender, age, tenure, balance, num_of_products, has_cr_card, is_active_member, estimated_salary)
 
-    # Preprocessing for categorical features (assuming One-Hot Encoding)
-    # categorical_features = ["Geography", "HasCrCard", "IsActiveMember"]
-    # encoder = OneHotEncoder(sparse=False)  # Set sparse=False for easier handling
+        # Make the prediction
+        prediction = model.predict(features.values.reshape(1, -1))
+        if prediction[0] == 0:
+            result = 'Not Churn'
+        else:
+            result = 'Churn'
 
-    # Prepare user input as a DataFrame (assuming model expects a DataFrame)
-    user_data = pd.DataFrame({
-        "CreditScore": [credit_score],
-        "Geography": [geography],
-        "Gender": [gender],
-        "Age": [age],
-        "Tenure": [tenure],
-        "Balance": [balance],
-        "NumOfProducts": [num_of_products],
-        "HasCrCard": [1 if has_cr_card == "Yes" else 0],
-        "IsActiveMember": [1 if is_active_member == "Yes" else 0],
-        "EstimatedSalary": [estimated_salary]
-    })
-    print(user_data)
+        st.success(f'The prediction is: {result}')
 
-    def load_scalers_encoder(scaler_path="robust_scaler.pkl", encoder_path="oneHot_encode_geo.pkl"):
-        with open(scaler_path, "rb") as scaler_file:
-            scalers = pickle.load(scaler_file)
-        with open(encoder_path, "rb") as encoder_file:
-            encoder = pickle.load(encoder_file)
-        return scalers, encoder
+def preprocess_features(credit_score, geography, gender, age, tenure, balance, num_of_products, has_cr_card, is_active_member, estimated_salary):
+    # Encode categorical features
+    gender_encoded = gender_encode["Gender"][gender]
+    has_cr_card_encoded = 1 if has_cr_card == "Yes" else 0
+    is_active_member_encoded = 1 if is_active_member == "Yes" else 0
+    geo_encoded = geo_encoder.transform([[geography]]).toarray()[0]
 
+    # Robust scaling for Age and Credit Score
+    age_scaled,credit_score_scaled = robust_scaler.transform([[age,credit_score]])[0]
     
+    # MinMax scaling for Balance and Estimated Salary
+    balance_scaled,estimated_salary_scaled = minmax_scaler.transform([[balance,estimated_salary]])[0]
+    
+    # Create a DataFrame with the processed features
+    features = pd.DataFrame({
+        'CreditScore': [credit_score_scaled],
+        'Gender': [gender_encoded],
+        'Age': [age_scaled],
+        'Tenure': [tenure],
+        'Balance': [balance_scaled],
+        'NumOfProducts': [num_of_products],
+        'HasCrCard': [has_cr_card_encoded],
+        'IsActiveMember': [is_active_member_encoded],
+        'EstimatedSalary': [estimated_salary_scaled]
+    })
 
-    # print(user_data.columns)
+    # Concatenate the one-hot encoded Geography features
+    features = pd.concat([features, pd.DataFrame({f'Geography_{col}': geo_encoded[i:i+1]
+                                                  for i, col in enumerate(['Geography_France', 'Geography_Germany', 'Geography_Spain'])},
+                                                 index=[0])], axis=1)
 
-    # Make prediction button with a loading indicator
-    if st.button("Predict Churn Risk"):
-        all_filled = credit_score and geography and gender and age and tenure and balance and num_of_products and has_cr_card and is_active_member and estimated_salary
-        if not all_filled:
-            st.error("Please fill in all fields before submitting.")
-            return
-        # Load the scalers and encoder
-        scalers, encoder = load_scalers_encoder()
+    return features
 
-        categorical = ['Geography', 'Gender']
-        conti = ['CreditScore', 'Balance', 'EstimatedSalary']
-        
-        user_data_subset = user_data[categorical]
-        user_data_encoded = pd.DataFrame(encoder.transform(user_data_subset).toarray(), columns=encoder.get_feature_names_out(categorical))
-        user_data = user_data.reset_index(drop=True)
-        user_data = pd.concat([user_data, user_data_encoded], axis=1)
-        user_data.drop(categorical, axis=1, inplace=True)
-
-
-        # scaler
-        user_data[conti] = scalers.transform(user_data[conti])
-        with st.spinner("Making prediction..."):
-            # Load the pickled model from its saved location
-            with open("BestModel_XGB_rev.pkl", "rb") as model_file:
-                model = pickle.load(model_file)
-
-            # Make prediction
-            prediction = model.predict(user_data)[0]  # Assuming prediction is a probability
-
-            # Display prediction with clear interpretation
-            if prediction == 1:
-                st.write("Predicted: **CHURN**")
-            else:
-                st.write("Predicted: **NOT CHURN**")
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
+
