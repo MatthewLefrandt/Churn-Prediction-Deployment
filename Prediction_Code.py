@@ -65,23 +65,8 @@ def preprocess_features(credit_score, geography, gender, age, tenure, balance, n
     balance_scaled = minmax_scaler.transform([[balance]])[0][0]
     estimated_salary_scaled = minmax_scaler.transform([[estimated_salary]])[0][0]
 
-    # Create a DataFrame with the processed features
-    features = pd.DataFrame({
-        'CreditScore': [credit_score_scaled],
-        'Gender': [gender_encoded],
-        'Age': [age_scaled],
-        'Tenure': [tenure],
-        'Balance': [balance_scaled],
-        'NumOfProducts': [num_of_products],
-        'HasCrCard': [has_cr_card_encoded],
-        'IsActiveMember': [is_active_member_encoded],
-        'EstimatedSalary': [estimated_salary_scaled]
-    })
-
-    # Concatenate the one-hot encoded Geography features
-    features = pd.concat([features, pd.DataFrame({f'Geography_{col}': geo_encoded[i:i+1]
-                                                  for i, col in enumerate(geo_encoder.get_feature_names_out())},
-                                                 index=[0])], axis=1)
+    # Create a list with the processed features
+    features = [credit_score_scaled, gender_encoded, age_scaled, tenure, balance_scaled, num_of_products, has_cr_card_encoded, is_active_member_encoded, estimated_salary_scaled] + geo_encoded.tolist()
 
     return features
 
