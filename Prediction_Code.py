@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[ ]:
-
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -54,7 +48,7 @@ def main():
 
 def preprocess_features(credit_score, geography, gender, age, tenure, balance, num_of_products, has_cr_card, is_active_member, estimated_salary):
     # Encode categorical features
-    gender_encoded = gender_encode[gender]
+    gender_encoded = gender_encode.get(gender, 0)  # Menggunakan .get() untuk menghindari KeyError
     has_cr_card_encoded = 1 if has_cr_card == "Yes" else 0
     is_active_member_encoded = 1 if is_active_member == "Yes" else 0
     geo_encoded = geo_encoder.transform([[geography]]).toarray()[0]
@@ -89,4 +83,3 @@ def preprocess_features(credit_score, geography, gender, age, tenure, balance, n
 
 if __name__ == '__main__':
     main()
-
