@@ -60,10 +60,10 @@ def preprocess_features(credit_score, geography, gender, age, tenure, balance, n
     geo_encoded = geo_encoder.transform([[geography]]).toarray()[0]
 
     # Robust scaling for Age and Credit Score
-    age_scaled,credit_score_scaled = robust_scaler.transform([[age,credit_score]])[0]
+    age_scaled, credit_score_scaled = robust_scaler.transform([[age, credit_score]])[0]
     
     # MinMax scaling for Balance and Estimated Salary
-    balance_scaled,estimated_salary_scaled = minmax_scaler.transform([[balance,estimated_salary]])[0]
+    balance_scaled, estimated_salary_scaled = minmax_scaler.transform([[balance, estimated_salary]])[0]
     
     # Create a DataFrame with the processed features
     features = pd.DataFrame({
@@ -78,10 +78,14 @@ def preprocess_features(credit_score, geography, gender, age, tenure, balance, n
         'EstimatedSalary': [estimated_salary_scaled]
     })
 
-    # Concatenate the one-hot encoded Geography features
-    features = pd.concat([features, pd.DataFrame({f'Geography_{col}': geo_encoded[i:i+1] for i, col in enumerate(['Geography_France', 'Geography_Germany', 'Geography_Spain'])},index=[0])], axis=1)
+    # Create a DataFrame for the encoded geography feature
+    geo_df = pd.DataFrame({f'Geography_{col}': geo_encoded[i] for i, col in enumerate(['France', 'Germany', 'Spain'])}, index=[0])
+
+    # Concatenate the one-hot encoded Geography features with the existing features DataFrame
+    features = pd.concat([features, geo_df], axis=1)
 
     return features
+
 
 if __name__ == '__main__':
     main()
