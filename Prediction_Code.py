@@ -41,7 +41,8 @@ def main():
         features = preprocess_features(credit_score, geography, gender, age, tenure, balance, num_of_products, has_cr_card, is_active_member, estimated_salary)
 
         # Make the prediction
-        prediction = model.predict(features.values.reshape(1, -1))
+        prediction = model.predict(features)
+
         if prediction[0] == 0:
             result = 'Not Churn'
         else:
@@ -51,11 +52,7 @@ def main():
 
 def preprocess_features(credit_score, geography, gender, age, tenure, balance, num_of_products, has_cr_card, is_active_member, estimated_salary):
     # Encode categorical features
-    if gender in gender_encode:
-        gender_encoded = gender_encode[gender]
-    else:
-        gender_encoded = 0  # or any other default value
-
+    gender_encoded = gender_encode.get(gender, 0)  # or any other default value
     has_cr_card_encoded = 1 if has_cr_card == "Yes" else 0
     is_active_member_encoded = 1 if is_active_member == "Yes" else 0
     geo_encoded = geo_encoder.transform([[geography]]).toarray()[0]
