@@ -79,9 +79,7 @@ def preprocess_features(credit_score, geography, gender, age, tenure, balance, n
     })
 
     # Concatenate the one-hot encoded Geography features
-    features = pd.concat([features, pd.DataFrame({f'Geography_{col}': geo_encoded[i:i+1]
-                                                  for i, col in enumerate(['Geography_France', 'Geography_Germany', 'Geography_Spain'])},
-                                                 index=[0])], axis=1)
+    features = pd.concat([features, pd.DataFrame({f'Geography_{col}': geo_encoded[i:i+1] for i, col in enumerate(['Geography_France', 'Geography_Germany', 'Geography_Spain'])},index=[0])], axis=1)
 
     return features
 
