@@ -1,144 +1,85 @@
+import streamlit as st
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split
-from sklearn import metrics
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score, roc_auc_score, log_loss
-from sklearn.metrics import classification_report, confusion_matrix
-import xgboost as xgb
-from sklearn.preprocessing import RobustScaler, MinMaxScaler
-from sklearn.metrics import classification_report
-from sklearn.model_selection import GridSearchCV
 import pickle
-import warnings
-warnings.filterwarnings("ignore")
 
-class ImportData:
-    def __init__(self, file_path):
-        self.file_path = file_path
-        self.data = None
-        self.input_df = None
-        self.output_df = None
+# Load the trained model
+filename = 'BestModel_XGB_rev.pkl'
+model = pickle.load(open(filename, 'rb'))
 
-    def load_data(self, delimiter=','):
-        self.data = pd.read_csv(self.file_path, delimiter=delimiter)
+# Load the encoder objects
+filename_gender_encode = 'gender_encode.pkl'
+gender_encode = pickle.load(open(filename_gender_encode, 'rb'))
 
-    def create_input_output(self, target_column):
-        self.output_df = self.data[target_column]
-        self.input_df = self.data.drop(target_column, axis=1)
+filename_geo_encode = 'oneHot_encode_geo.pkl'
+geo_encoder = pickle.load(open(filename_geo_encode, 'rb'))
 
-class DataPreprocessing:
-    def __init__(self, input_df, output_df):
-        self.input_df = input_df
-        self.output_df = output_df
-        self.x_train = None
-        self.x_test = None
-        self.y_train = None
-        self.y_test = None
+# Robust and MinMax scalers
+robust_scaler = pickle.load(open('robust_scaler.pkl', 'rb'))
+minmax_scaler = pickle.load(open('minmax_scaler.pkl', 'rb'))
 
-    def drop_columns(self, column_names):
-        for column_name in column_names:
-            if column_name in self.input_df.columns:
-                self.input_df.drop(columns=[column_name], inplace=True)
+def main():
+    st.title('Churn Prediction App')
 
-    def split_dataset(self, test_size=0.2, random_state=42):
-        self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(self.input_df, self.output_df, test_size=test_size, random_state=random_state)
+    # Get user input
+    credit_score = st.number_input("Credit Score", 0, 1000)
+    geography = st.selectbox("Geography", ["France", "Germany", "Spain"])
+    gender = st.selectbox("Gender", ["Male", "Female"])
+    age = st.number_input("Age", 0, 100)
+    tenure = st.number_input("Tenure", 0, 100)
+    balance = st.number_input("Balance", 0, 100000)
+    num_of_products = st.number_input("Number of Products", 0, 10)
+    has_cr_card = st.selectbox("Has Credit Card", ["Yes", "No"])
+    is_active_member = st.selectbox("Is Active Member", ["Yes", "No"])
+    estimated_salary = st.number_input("Estimated Salary", 0, 1000000)
 
-    def fill_missing_values(self, column_name, method='mean'):
-        if method == 'mean':
-            fill_value = self.x_train[column_name].mean()
-        elif method == 'median':
-            fill_value = self.x_train[column_name].median()
-        elif method == 'mode':
-            fill_value = self.x_train[column_name].mode()[0]
+    if st.button('Predict'):
+        # Preprocess the input features
+        features = preprocess_features(credit_score, geography, gender, age, tenure, balance, num_of_products, has_cr_card, is_active_member, estimated_salary)
+
+        # Make the prediction
+        prediction = model.predict(features.values.reshape(1, -1))
+        if prediction[0] == 0:
+            result = 'Not Churn'
         else:
-            return None
-        self.x_train[column_name].fillna(fill_value, inplace=True)
-        self.x_test[column_name].fillna(fill_value, inplace=True)
+            result = 'Churn'
 
-    def encode_feature(self, column_name):
-        self.x_train = pd.get_dummies(self.x_train, columns=[column_name])
-        self.x_test = pd.get_dummies(self.x_test, columns=[column_name])
+        st.success(f'The prediction is: {result}')
 
-    def replace_categorical(self, train_encode, test_encode):
-        self.x_train.replace(train_encode, inplace=True)
-        self.x_test.replace(test_encode, inplace=True)
+def preprocess_features(credit_score, geography, gender, age, tenure, balance, num_of_products, has_cr_card, is_active_member, estimated_salary):
+    # Encode categorical features
+    gender_encoded = gender_encode[gender]
+    has_cr_card_encoded = 1 if has_cr_card == "Yes" else 0
+    is_active_member_encoded = 1 if is_active_member == "Yes" else 0
+    geo_encoded = geo_encoder.transform([[geography]]).toarray()[0]
 
-    def scale_data(self, scaler, columns):
-        self.x_train[columns] = scaler.fit_transform(self.x_train[columns])
-        self.x_test[columns] = scaler.transform(self.x_test[columns])
+    # Robust scaling for Age and Credit Score
+    age_scaled = robust_scaler.transform([[age]])[0][0]
+    credit_score_scaled = robust_scaler.transform([[credit_score]])[0][0]
 
-class Modelling:
-    def __init__(self, x_train, y_train, x_test, y_test):
-        self.x_train = x_train
-        self.y_train = y_train
-        self.x_test = x_test
-        self.y_test = y_test
-        self.model = None
+    # MinMax scaling for Balance and Estimated Salary
+    balance_scaled = minmax_scaler.transform([[balance]])[0][0]
+    estimated_salary_scaled = minmax_scaler.transform([[estimated_salary]])[0][0]
 
-    def train_XGB(self, objective='binary:logistic', learning_rate= 0.1, max_depth= 3, n_estimators= 200, random_state=42):
-        self.model = xgb.XGBClassifier(objective=objective, learning_rate=learning_rate, max_depth=max_depth, n_estimators=n_estimators, random_state = random_state)
-        self.model.fit(self.x_train, self.y_train)
+    # Create a DataFrame with the processed features
+    features = pd.DataFrame({
+        'CreditScore': [credit_score_scaled],
+        'Gender': [gender_encoded],
+        'Age': [age_scaled],
+        'Tenure': [tenure],
+        'Balance': [balance_scaled],
+        'NumOfProducts': [num_of_products],
+        'HasCrCard': [has_cr_card_encoded],
+        'IsActiveMember': [is_active_member_encoded],
+        'EstimatedSalary': [estimated_salary_scaled]
+    })
 
-    def evaluate_model(self):
-        if self.model is None:
-            print("Model Untrained")
-            return
-        y_predict = self.model.predict(self.x_test)
-        print('\nClassification Report\n')
-        print(classification_report(self.y_test, y_predict))
+    # Concatenate the one-hot encoded Geography features
+    features = pd.concat([features, pd.DataFrame({f'Geography_{col}': geo_encoded[i:i+1]
+                                                  for i, col in enumerate(geo_encoder.get_feature_names_out())},
+                                                 index=[0])], axis=1)
 
-    def save_model(self, filename):
-      with open(filename, 'wb') as file:
-        pickle.dump(self.model, file)
+    return features
 
-"""**Usage**"""
-
-#Import New Dataset
-data_importer = ImportData('data_C.csv')
-data_importer.load_data()
-data_importer.create_input_output('churn')
-
-#Define The Input and Output
-input_data = data_importer.input_df
-output_data = data_importer.output_df
-
-# Preprocess The Data
-preprocessor = DataPreprocessing(input_data, output_data)
-
-#Drop Irrelevant Data
-preprocessor.drop_columns(['Unnamed: 0', 'id', 'CustomerId', 'Surname'])
-
-# Dataset Splitting
-preprocessor.split_dataset()
-x_train = preprocessor.x_train
-x_test = preprocessor.x_test
-y_train = preprocessor.y_train
-y_test = preprocessor.y_test
-
-# Replace categorical to Numerical
-train_encode = {"Gender": {"Male": 1, "Female": 0}}
-test_encode = {"Gender": {"Male": 1, "Female": 0}}
-preprocessor.replace_categorical(train_encode, test_encode)
-
-#One Hot Encoding
-preprocessor.encode_feature('Geography')
-
-# impute Missing Value
-preprocessor.fill_missing_values(column_name = 'CreditScore', method = 'mean')
-
-# Scaling Dataset
-preprocessor.scale_data(RobustScaler(), ['Age', 'CreditScore'])
-preprocessor.scale_data(MinMaxScaler(), ['Balance', 'EstimatedSalary'])
-
-# Create an instance of Modelling
-model = Modelling(preprocessor.x_train, preprocessor.y_train, preprocessor.x_test, preprocessor.y_test)
-
-# Train Decision Tree Classifier with default parameters
-model.train_XGB()
-
-# Evaluate the trained model
-model.evaluate_model()
-
-#model.save_model('BestModel_XGB.pkl')
+if __name__ == '__main__':
+    main()
