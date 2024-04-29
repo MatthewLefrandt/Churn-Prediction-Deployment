@@ -54,16 +54,13 @@ def preprocess_features(credit_score, geography, gender, age, tenure, balance, n
     geo_encoded = geo_encoder.transform([[geography]]).toarray()[0]
 
     # Robust scaling for Age and Credit Score
-    age_scaled = robust_scaler.transform([[age]])[0][0]
-    credit_score_scaled = robust_scaler.transform([[credit_score]])[0][0]
+    age_scaled = robust_scaler.transform([[age, credit_score]])[0][0]
 
     # MinMax scaling for Balance and Estimated Salary
-    balance_scaled = minmax_scaler.transform([[balance]])[0][0]
-    estimated_salary_scaled = minmax_scaler.transform([[estimated_salary]])[0][0]
+    balance_scaled = minmax_scaler.transform([[balance, estimated_salary]])[0][0]
 
     # Create a DataFrame with the processed features
     features = pd.DataFrame({
-        'CreditScore': [credit_score_scaled],
         'Gender': [gender_encoded],
         'Age': [age_scaled],
         'Tenure': [tenure],
@@ -71,7 +68,7 @@ def preprocess_features(credit_score, geography, gender, age, tenure, balance, n
         'NumOfProducts': [num_of_products],
         'HasCrCard': [has_cr_card_encoded],
         'IsActiveMember': [is_active_member_encoded],
-        'EstimatedSalary': [estimated_salary_scaled]
+        'EstimatedSalary': [estimated_salary]
     })
 
     # Concatenate the one-hot encoded Geography features
