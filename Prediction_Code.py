@@ -33,7 +33,7 @@ def main():
     gender = st.selectbox("Gender", ["Male", "Female"])
     age = st.number_input("Age", 0, 100)
     tenure = st.number_input("Tenure", 0, 100)
-    balance = st.number_input("Balance", 0, 100000)
+    balance = st.number_input("Balance", 0, 1000000)
     num_of_products = st.number_input("Number of Products", 0, 10)
     has_cr_card = st.selectbox("Has Credit Card", ["Yes", "No"])
     is_active_member = st.selectbox("Is Active Member", ["Yes", "No"])
